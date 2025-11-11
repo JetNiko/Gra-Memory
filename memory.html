@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Chase - The Addictive Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .game-container {
+            perspective: 1000px;
+        }
+        
+        .color-option {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .color-option:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .color-option:active {
+            transform: translateY(1px);
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+    <div class="text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">Color Chase</h1>
+        <p class="text-lg text-gray-600">Match the color before time runs out!</p>
+    </div>
+    
+    <div class="game-container bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <div class="text-left">
+                <p class="text-gray-500 text-sm">Score</p>
+                <p id="score" class="text-2xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="text-right">
+                <p class="text-gray-500 text-sm">Time</p>
+                <p id="timer" class="text-2xl font-bold text-gray-800">10</p>
+            </div>
+        </div>
+        
+        <div id="target-color" class="w-full h-32 rounded-xl mb-6 shadow-md flex items-center justify-center">
+            <p id="color-name" class="text-white font-bold text-xl bg-black bg-opacity-30 px-4 py-2 rounded-full">Match This!</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div id="option1" class="color-option h-24 rounded-xl flex items-center justify-center text-white font-bold text-lg"></div>
+            <div id="option2" class="color-option h-24 rounded-xl flex items-center justify-center text-white font-bold text-lg"></div>
+            <div id="option3" class="color-option h-24 rounded-xl flex items-center justify-center text-white font-bold text-lg"></div>
+            <div id="option4" class="color-option h-24 rounded-xl flex items-center justify-center text-white font-bold text-lg"></div>
+        </div>
+        
+        <button id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-6 rounded-xl font-bold text-lg transition duration-300 pulse">
+            Start Game
+        </button>
+    </div>
+    
+    <div class="mt-8 bg-white rounded-xl shadow-md p-6 w-full max-w-md">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">How to Play</h2>
+        <ul class="space-y-3 text-gray-600">
+            <li class="flex items-start">
+                <span class="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center mr-3">1</span>
+                <span>Click Start Game to begin</span>
+            </li>
+            <li class="flex items-start">
+                <span class="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center mr-3">2</span>
+                <span>Match the target color at the top with one of the options below</span>
+            </li>
+            <li class="flex items-start">
+                <span class="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center mr-3">3</span>
+                <span>Each correct match gives you points and more time</span>
+            </li>
+            <li class="flex items-start">
+                <span class="bg-indigo-100 text-indigo-800 rounded-full w-6 h-6 flex items-center justify-center mr-3">4</span>
+                <span>The game gets faster as you score more points!</span>
+            </li>
+        </ul>
+    </div>
+    
+    <div id="high-score-display" class="mt-8 bg-indigo-600 text-white rounded-xl shadow-md p-4 text-center hidden">
+        <p class="font-bold">New High Score: <span id="high-score-value">0</span>!</p>
+    </div>
+    
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none overflow-hidden"></div>
+
+    <script>
+        // Game variables
+        let score = 0;
+        let timer = 10;
+        let gameInterval;
+        let timerInterval;
+        let isGameRunning = false;
+        let highScore = localStorage.getItem('colorChaseHighScore') || 0;
+        let difficulty = 1;
+        
+        // DOM elements
+        const targetColor = document.getElementById('target-color');
+        const colorName = document.getElementById('color-name');
+        const option1 = document.getElementById('option1');
+        const option2 = document.getElementById('option2');
+        const option3 = document.getElementById('option3');
+        const option4 = document.getElementById('option4');
+        const startBtn = document.getElementById('start-btn');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const highScoreValue = document.getElementById('high-score-value');
+        const confettiContainer = document.getElementById('confetti-container');
+        
+        // Color options
+        const colors = [
+            { name: "Red", value: "#ef4444" },
+            { name: "Blue", value: "#3b82f6" },
+            { name: "Green", value: "#10b981" },
+            { name: "Yellow", value: "#f59e0b" },
+            { name: "Purple", value: "#8b5cf6" },
+            { name: "Pink", value: "#ec4899" },
+            { name: "Orange", value: "#f97316" },
+            { name: "Cyan", value: "#06b6d4" },
+            { name: "Rose", value: "#f43f5e" },
+            { name: "Indigo", value: "#6366f1" }
+        ];
+        
+        // Initialize game
+        function initGame() {
+            score = 0;
+            timer = 10;
+            difficulty = 1;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = timer;
+            startBtn.textContent = "Start Game";
+            startBtn.classList.add('pulse');
+            highScoreDisplay.classList.add('hidden');
+            
+            // Reset colors
+            targetColor.style.backgroundColor = "#6b7280";
+            colorName.textContent = "Match This!";
+            
+            option1.style.backgroundColor = "";
+            option2.style.backgroundColor = "";
+            option3.style.backgroundColor = "";
+            option4.style.backgroundColor = "";
+            
+            option1.textContent = "";
+            option2.textContent = "";
+            option3.textContent = "";
+            option4.textContent = "";
+            
+            // Clear any existing intervals
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            isGameRunning = false;
+        }
+        
+        // Start game
+        function startGame() {
+            if (isGameRunning) return;
+            
+            isGameRunning = true;
+            score = 0;
+            timer = 10;
+            difficulty = 1;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = timer;
+            startBtn.textContent = "Game Running";
+            startBtn.classList.remove('pulse');
+            startBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            startBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+            
+            // Start timer
+            startTimer();
+            
+            // Generate first round
+            generateRound();
+        }
+        
+        // Start timer countdown
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timer--;
+                timerDisplay.textContent = timer;
+                
+                // Color timer based on remaining time
+                if (timer <= 3) {
+                    timerDisplay.classList.add('text-red-600');
+                    timerDisplay.classList.remove('text-gray-800');
+                } else {
+                    timerDisplay.classList.add('text-gray-800');
+                    timerDisplay.classList.remove('text-red-600');
+                }
+                
+                if (timer <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+        
+        // Generate a new round
+        function generateRound() {
+            // Clear any existing game interval
+            clearInterval(gameInterval);
+            
+            // Select target color
+            const targetIndex = Math.floor(Math.random() * colors.length);
+            const target = colors[targetIndex];
+            
+            // Set target color display
+            targetColor.style.backgroundColor = target.value;
+            colorName.textContent = target.name;
+            
+            // Create options array with one correct answer
+            let options = [target];
+            
+            // Fill with random wrong answers
+            while (options.length < 4) {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                if (!options.some(c => c.name === randomColor.name)) {
+                    options.push(randomColor);
+                }
+            }
+            
+            // Shuffle options
+            options = shuffleArray(options);
+            
+            // Assign colors and names to options
+            option1.style.backgroundColor = options[0].value;
+            option1.textContent = options[0].name;
+            option1.dataset.correct = options[0].name === target.name;
+            
+            option2.style.backgroundColor = options[1].value;
+            option2.textContent = options[1].name;
+            option2.dataset.correct = options[1].name === target.name;
+            
+            option3.style.backgroundColor = options[2].value;
+            option3.textContent = options[2].name;
+            option3.dataset.correct = options[2].name === target.name;
+            
+            option4.style.backgroundColor = options[3].value;
+            option4.textContent = options[3].name;
+            option4.dataset.correct = options[3].name === target.name;
+            
+            // Set up automatic round change (gets faster with higher difficulty)
+            gameInterval = setInterval(() => {
+                generateRound();
+            }, 3000 / difficulty);
+        }
+        
+        // Handle color selection
+        function handleSelection(event) {
+            if (!isGameRunning) return;
+            
+            const selectedOption = event.currentTarget;
+            const isCorrect = selectedOption.dataset.correct === "true";
+            
+            if (isCorrect) {
+                // Correct answer
+                score++;
+                scoreDisplay.textContent = score;
+                
+                // Add time based on difficulty
+                timer += 2 / difficulty;
+                timerDisplay.textContent = Math.floor(timer);
+                
+                // Increase difficulty every 5 points
+                if (score % 5 === 0) {
+                    difficulty += 0.5;
+                }
+                
+                // Visual feedback
+                selectedOption.classList.add('ring-4', 'ring-green-500');
+                setTimeout(() => {
+                    selectedOption.classList.remove('ring-4', 'ring-green-500');
+                }, 300);
+                
+                // Generate new round
+                clearInterval(gameInterval);
+                generateRound();
+                
+                // Check for high score
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('colorChaseHighScore', highScore);
+                    showHighScore();
+                }
+            } else {
+                // Wrong answer
+                timer -= 2;
+                timerDisplay.textContent = timer;
+                
+                // Visual feedback
+                selectedOption.classList.add('ring-4', 'ring-red-500');
+                setTimeout(() => {
+                    selectedOption.classList.remove('ring-4', 'ring-red-500');
+                }, 300);
+                
+                if (timer <= 0) {
+                    endGame();
+                }
+            }
+        }
+        
+        // End game
+        function endGame() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            
+            startBtn.textContent = "Play Again";
+            startBtn.classList.add('pulse');
+            startBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+            startBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            
+            // Show game over with score
+            colorName.textContent = `Game Over! Score: ${score}`;
+            targetColor.style.backgroundColor = "#6b7280";
+            
+            // Check for high score
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('colorChaseHighScore', highScore);
+                showHighScore();
+            }
+        }
+        
+        // Show high score celebration
+        function showHighScore() {
+            highScoreValue.textContent = highScore;
+            highScoreDisplay.classList.remove('hidden');
+            highScoreDisplay.classList.add('floating');
+            createConfetti();
+        }
+        
+        // Create confetti effect
+        function createConfetti() {
+            // Clear existing confetti
+            confettiContainer.innerHTML = '';
+            
+            // Create new confetti
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                
+                // Random properties
+                const size = Math.random() * 10 + 5;
+                const color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                const left = Math.random() * 100;
+                const animationDuration = Math.random() * 3 + 2;
+                const delay = Math.random() * 5;
+                
+                confetti.style.width = `${size}px`;
+                confetti.style.height = `${size}px`;
+                confetti.style.backgroundColor = color;
+                confetti.style.left = `${left}%`;
+                confetti.style.animation = `fall ${animationDuration}s linear ${delay}s forwards`;
+                
+                // Add to container
+                confettiContainer.appendChild(confetti);
+            }
+            
+            // Add CSS for falling animation
+            const style = document.createElement('style');
+            style.innerHTML = `
+                @keyframes fall {
+                    0% { 
+                        transform: translateY(-100vh) rotate(0deg); 
+                        opacity: 1;
+                    }
+                    100% { 
+                        transform: translateY(100vh) rotate(360deg); 
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Helper function to shuffle array
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', () => {
+            if (isGameRunning) {
+                initGame();
+            } else {
+                startGame();
+            }
+        });
+        
+        option1.addEventListener('click', handleSelection);
+        option2.addEventListener('click', handleSelection);
+        option3.addEventListener('click', handleSelection);
+        option4.addEventListener('click', handleSelection);
+        
+        // Initialize game on load
+        initGame();
+    </script>
+</body>
+</html>
